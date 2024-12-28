@@ -68,5 +68,4 @@ jobs:
           git config user.email "${{ secrets.EMAIL }}"
           git add VERSION CHANGELOG.md
           git commit -m "Version bump to ${{ env.new_version }} with changelog"
-      #    git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/devops26012024/Playback_DepStrategy_Improved.git
-        #  git push
+          git push
