@@ -36,6 +36,9 @@ jobs:
         with:
           terraform_version: 1.5.0
 
+      - name: Terraform Init
+        run: terraform init
+
       - name: Increment Version
         id: version
         run: |
