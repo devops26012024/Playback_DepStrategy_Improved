@@ -1,0 +1,52 @@
+name: Terraform Versioning and Changelog
+
+on:
+  workflow_run:
+    workflows: ["Deploy Infrastructure"]
+    types:
+      - completed
+
+jobs:
+  version_and_changelog:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download Plan Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: terraform-plan
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+
+      - name: Increment Version
+        id: version
+        run: |
+          current_version=$(cat VERSION)
+          new_version=$(echo $current_version | awk -F. '{$NF += 1; OFS="."; print $0}')
+          echo $new_version > VERSION
+          echo "new_version=$new_version" >> $GITHUB_ENV
+
+      - name: Show Terraform Plan
+        run: terraform show tfplan > plan_output.txt
+
+      - name: Generate Changelog Entry
+        id: changelog
+        run: |
+          plan_changes=$(cat plan_output.txt | grep -A 100 "Terraform will perform the following actions" | grep -v "Plan:")
+          echo -e "## Version ${{ env.new_version }}\n\n### Changes:\n\n$plan_changes\n" >> CHANGELOG.md
+
+      - name: Commit and Push Changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          git config user.name "${{ secrets.USERNAME }}"
+          git config user.email "${{ secrets.EMAIL }}"
+          git add VERSION CHANGELOG.md
+          git commit -m "Version bump to ${{ env.new_version }} with changelog"
+          git push
