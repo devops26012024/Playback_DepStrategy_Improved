@@ -3,6 +3,10 @@ name: Deploy Infrastructure
 on:
   push:
 
+permissions:
+  id-token: write 
+  contents: read   
+
 jobs:
   deploy:
     name: Deploy Terraform
@@ -35,3 +39,6 @@ jobs:
         with:
           name: terraform-plan
           path: tfplan
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
