@@ -14,10 +14,18 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Download Plan Artifact
-        uses: actions/download-artifact@v3
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v3
         with:
-          name: terraform-plan
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-session-name: ChangelogSession
+
+
+      - name: Download Plan from S3
+        run: |
+          aws s3 cp s3://pradeep-terraform-1234333/playback_improved/tfplan ./tfplan --region ${{ secrets.AWS_REGION }}
+          
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
