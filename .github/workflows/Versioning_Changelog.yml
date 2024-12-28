@@ -59,6 +59,7 @@ jobs:
           plan_changes=$(cat plan_output.txt | grep -A 100 "Terraform will perform the following actions" | grep -v "Plan:")
           echo -e "## Version ${{ env.new_version }}\n\n### Changes:\n\n$plan_changes\n" >> CHANGELOG.md
 
+
       - name: Commit and Push Changes
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
@@ -67,4 +68,5 @@ jobs:
           git config user.email "${{ secrets.EMAIL }}"
           git add VERSION CHANGELOG.md
           git commit -m "Version bump to ${{ env.new_version }} with changelog"
+          git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/devops26012024/Playback_DepStrategy_Improved.git
           git push
