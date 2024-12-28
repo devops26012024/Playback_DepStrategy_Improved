@@ -50,6 +50,9 @@ jobs:
       - name: Show Terraform Plan
         run: terraform show tfplan > plan_output.txt
 
+      - name: Debug Plan Output
+        run: cat plan_output.txt
+
       - name: Generate Changelog Entry
         id: changelog
         run: |
