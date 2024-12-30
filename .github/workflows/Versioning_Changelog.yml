@@ -62,10 +62,10 @@ jobs:
 
       - name: Commit and Push Changes
         env:
-         GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
-          git config --global user.name "${{ secrets.USERNAME }}"
-          git config --global user.email "${{ secrets.EMAIL }}"
+          git config user.name "${{ secrets.USERNAME }}"
+          git config user.email "${{ secrets.EMAIL }}"
           git add VERSION CHANGELOG.md
           git commit -m "Version bump to ${{ env.new_version }} with changelog"
           git push
