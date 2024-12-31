@@ -3,7 +3,7 @@ name: Deploy Infrastructure
 on:
   push:
 
-permissions:
+permissions: 
   id-token: write 
   contents: read   
 
