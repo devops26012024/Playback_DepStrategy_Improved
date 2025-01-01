@@ -25,15 +25,15 @@ jobs:
         with:
           terraform_version: 1.5.0
 
-      - name: Initialize Terraform
-        run: terraform init
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v3
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
           role-session-name: ChangelogSession
+
+      - name: Initialize Terraform
+        run: terraform init
 
       - name: Download Terraform State File from S3
         run: |
