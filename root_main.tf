@@ -34,7 +34,7 @@ resource "aws_instance" "ec2" {
   security_groups = [aws_security_group.ec2_sg.name]
 
   tags = {
-    Name    = "Jan1st"
+    Name    = "Jan2nd"
     Version = var.version_name
   }
 }
