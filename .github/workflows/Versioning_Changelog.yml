@@ -27,39 +27,23 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
           role-session-name: ChangelogSession
 
-
-      - name: Download Plan from S3
+      - name: Download Terraform State File from S3
         run: |
-          aws s3 cp s3://pradeep-terraform-1234333/playback_improved/tfplan ./tfplan --region ${{ secrets.AWS_REGION }}
-          
+          aws s3 cp s3://pradeep-terraform-1234333/playback_improved/terraform.tfstate ./terraform.tfstate --region ${{ secrets.AWS_REGION }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.5.0
 
-      - name: Terraform Init
+      - name: Initialize Terraform
         run: terraform init
 
-      - name: Increment Version
-        id: version
+      - name: Show Terraform State Changes
+        id: state_changes
         run: |
-          current_version=$(cat VERSION)
-          new_version=$(echo $current_version | awk -F. '{$NF += 1; OFS="."; print $0}')
-          echo $new_version > VERSION
-          echo "new_version=$new_version" >> $GITHUB_ENV
-
-      - name: Show Terraform Plan
-        run: terraform show tfplan > plan_output.txt
-
-      - name: Debug Plan Output
-        run: cat plan_output.txt
-
-      - name: Generate Changelog Entry
-        id: changelog
-        run: |
-          plan_changes=$(cat plan_output.txt | grep -A 100 "Terraform will perform the following actions" | grep -v "Plan:")
-          echo -e "## Version ${{ env.new_version }}\n\n### Changes:\n\n$plan_changes\n" >> CHANGELOG.md
+          terraform show -json terraform.tfstate > state_output.json
+          jq -r '.values.root_module.resources[] | "Resource:
 
 
       - name: Commit and Push Changes
