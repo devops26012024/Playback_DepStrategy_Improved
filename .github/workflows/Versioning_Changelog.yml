@@ -42,11 +42,11 @@ jobs:
       - name: Show Terraform State Changes
         id: state_changes
         run: |
-          terraform show -json terraform.tfstate > state_output.json
+          terraform show -json terraform.tfstate > CHANGELOG.md
     #      jq -r '.values.root_module.resources[] | "Resource:
 
-      - name: Just to see terraform state output in json format
-        run: cat state_output.json
+   #   - name: Just to see terraform state output in json format
+     #   run: cat state_output.json
 
       - name: Commit and Push Changes
         env:
