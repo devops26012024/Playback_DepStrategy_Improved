@@ -43,7 +43,7 @@ jobs:
         id: state_changes
         run: |
           terraform show -json terraform.tfstate > state_output.json
-          jq -r '.values.root_module.resources[] | "Resource:
+    #      jq -r '.values.root_module.resources[] | "Resource:
 
       - name: Just to see terraform state output in json format
         run: cat state_output.json
