@@ -20,6 +20,14 @@ jobs:
         with:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+
+      - name: Initialize Terraform
+        run: terraform init
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v3
         with:
@@ -30,14 +38,6 @@ jobs:
       - name: Download Terraform State File from S3
         run: |
           aws s3 cp s3://pradeep-terraform-1234333/playback_improved/terraform.tfstate ./terraform.tfstate --region ${{ secrets.AWS_REGION }}
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.5.0
-
-      - name: Initialize Terraform
-        run: terraform init
 
       - name: Show Terraform State Changes
         id: state_changes
