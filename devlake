@@ -1,0 +1,234 @@
+provider "aws" {
+  region = "ap-south-1"
+}
+
+resource "aws_instance" "devlake" {
+  ami             = "ami-023a307f3d27ea427" # Ubuntu 22.04 LTS AMI (Update if needed)
+  instance_type   = "t3.medium"
+  key_name        = "terraform-key" # Replace with your keypair
+  security_groups = [aws_security_group.devlake_sg.name]
+
+  root_block_device {
+    volume_size           = 20    # Set storage size to 20GB
+    volume_type           = "gp3" # General Purpose SSD
+    delete_on_termination = true
+  }
+
+  user_data = <<-EOF
+    #!/bin/bash
+    sudo apt update && sudo apt upgrade -y
+    sudo apt install -y docker.io docker-compose git
+    sudo systemctl start docker
+    sudo systemctl enable docker
+    sudo usermod -aG docker ubuntu
+    newgrp docker
+
+    # Clone DevLake repo and start the service
+    git clone https://github.com/apache/incubator-devlake.git /home/ubuntu/devlake
+    cd /home/ubuntu/devlake
+    cp env.example .env
+    sudomv docker-compose-dev.yml docker-compose1.yml
+    sudo docker-compose up -d
+    # Create .env file
+    cat <<EOT > .env
+    # Licensed to the Apache Software Foundation (ASF) under one or more
+    # contributor license agreements. See the NOTICE file distributed with
+    # this work for additional information regarding copyright ownership.
+    # The ASF licenses this file to You under the Apache License, Version 2.0
+    # (the "License"); you may not use this file except in compliance with
+    # the License. You may obtain a copy of the License at
+    #
+    #     http://www.apache.org/licenses/LICENSE-2.0
+    #
+    # Unless required by applicable law or agreed to in writing, software
+    # distributed under the License is distributed on an "AS IS" BASIS,
+    # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    # See the License for the specific language governing permissions and
+    # limitations under the License.
+    #
+
+    PLUGIN_DIR=bin/plugins
+    REMOTE_PLUGIN_DIR=python/plugins
+
+    DB_URL=mysql://merico:merico@mysql:3306/lake?charset=utf8mb4&parseTime=True&loc=UTC
+    E2E_DB_URL=mysql://merico:merico@mysql:3306/lake_test?charset=utf8mb4&parseTime=True&loc=UTC
+    DB_LOGGING_LEVEL=Error
+    SKIP_SUBTASK_PROGRESS=false
+
+    PORT=8080
+    MODE=release
+    NOTIFICATION_ENDPOINT=
+    NOTIFICATION_SECRET=
+
+    API_TIMEOUT=120s
+    API_RETRY=3
+    API_REQUESTS_PER_HOUR=10000
+    PIPELINE_MAX_PARALLEL=1
+    RESUME_PIPELINES=true
+    LOGGING_LEVEL=
+    LOGGING_DIR=./logs
+    ENABLE_STACKTRACE=true
+    FORCE_MIGRATION=false
+
+    TAP_PROPERTIES_DIR=
+    DISABLED_REMOTE_PLUGINS=
+    ENCRYPTION_SECRET=
+
+    IN_SECURE_SKIP_VERIFY=false
+    ENDPOINT_CIDR_BLACKLIST=
+    FORBID_REDIRECTION=false
+
+    USE_GO_GIT_IN_GIT_EXTRACTOR=false
+    SKIP_COMMIT_STAT=false
+    SKIP_COMMIT_FILES=true
+
+    WRAP_RESPONSE_ERROR=
+
+    ENABLE_SUBTASKS_BY_DEFAULT="jira:collectIssueChangelogs:true,jira:extractIssueChangelogs:true,jira:convertIssueChangelogs:true,tapd:collectBugChangelogs:true,tapd:extractBugChangelogs:true,tapd:convertBugChangelogs:true,zentao:collectBugRepoCommits:true,zentao:extractBugRepoCommits:true,zentao:convertBugRepoCommits:true,zentao:collectStoryRepoCommits:true,zentao:extractStoryRepoCommits:true,zentao:convertStoryRepoCommits:true,zentao:collectTaskRepoCommits:true,zentao:extractTaskRepoCommits:true,zentao:convertTaskRepoCommits:true"
+    EOT
+
+    # Create docker-compose.yaml file
+    cat <<EOT > docker-compose.yaml
+    version: "3"
+    services:
+      mysql:
+        image: mysql:8
+        platform: linux/amd64
+        volumes:
+          - mysql-storage:/var/lib/mysql
+        restart: always
+        ports:
+          - 3306:3306
+        environment:
+          MYSQL_ROOT_PASSWORD: admin
+          MYSQL_DATABASE: lake
+          MYSQL_USER: merico
+          MYSQL_PASSWORD: merico
+          TZ: UTC
+        command: --character-set-server=utf8mb4 --collation-server=utf8mb4_bin --skip-log-bin
+
+      postgres:
+        image: postgres:14.2
+        platform: linux/amd64
+        volumes:
+          - postgres-storage:/var/lib/postgresql
+        restart: always
+        ports:
+          - 5432:5432
+        environment:
+          POSTGRES_DB: lake
+          POSTGRES_USER: merico
+          POSTGRES_PASSWORD: merico
+          TZ: UTC
+
+      grafana:
+        image: apache/devlake-dashboard:latest
+        platform: linux/amd64
+        ports:
+          - 3002:3000
+        volumes:
+          - grafana-storage:/var/lib/grafana
+        environment:
+          GF_SERVER_ROOT_URL: "http://localhost:4000/grafana"
+          GF_USERS_DEFAULT_THEME: "light"
+          MYSQL_URL: mysql:3306
+          MYSQL_DATABASE: lake
+          MYSQL_USER: merico
+          MYSQL_PASSWORD: merico
+          TZ: UTC
+        restart: always
+        depends_on:
+          - mysql
+
+      devlake:
+        image: apache/devlake:latest
+        platform: linux/amd64
+        ports:
+          - 8080:8080
+        restart: always
+        volumes:
+          - devlake-log:/app/logs
+        env_file:
+          - ./.env
+        environment:
+          ENCRYPTION_SECRET: my-strong-secret-key
+          LOGGING_DIR: /app/logs
+          DB_URL: mysql://merico:merico@mysql:3306/lake?charset=utf8mb4&parseTime=True
+          TZ: UTC
+        depends_on:
+          - mysql
+
+      config-ui:
+        image: apache/devlake-config-ui:latest
+        platform: linux/amd64
+        ports:
+          - 4000:4000
+        env_file:
+          - ./.env
+        environment:
+          DEVLAKE_ENDPOINT: devlake:8080
+          GRAFANA_ENDPOINT: grafana:3000
+          TZ: UTC
+        depends_on:
+          - devlake
+
+      authproxy:
+        image: quay.io/oauth2-proxy/oauth2-proxy:v7.4.0-amd64
+        network_mode: "bridge"
+        env_file:
+          - ./.env
+
+    volumes:
+      mysql-storage:
+      grafana-storage:
+      postgres-storage:
+      devlake-log:
+    EOT
+    # Start Docker Compose
+    sudo docker-compose up -d
+    # Wait for 60 seconds to ensure containers start properly
+    sleep 30
+    
+  EOF
+
+  tags = {
+    Name = "DevLake-Instance"
+  }
+}
+
+resource "aws_security_group" "devlake_sg" {
+  name        = "devlake_sg"
+  description = "Allow necessary ports for DevLake"
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # Restrict this to your IP for security
+  }
+
+  ingress {
+    from_port   = 4000
+    to_port     = 4000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+output "devlake_public_ip" {
+  value = aws_instance.devlake.public_ip
+  description = "Public IP of the DevLake instance"
+}
